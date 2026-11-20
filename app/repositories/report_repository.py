@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import column, delete, func, select, table
+from sqlalchemy import column, delete, func, or_, select, table
 from sqlalchemy.orm import Session
 
 from models.report import (
@@ -34,6 +34,8 @@ REPORT_READ_VIEW = table(
     column("report_id"),
     column("category_code"),
     column("title"),
+    column("content"),
+    column("overview"),
     column("revision"),
     column("update_at"),
 )
@@ -88,6 +90,52 @@ def find_report(
     if detail is None:
         raise RuntimeError(f"Report {report_id} has no detail row")
     return report, category_code, detail
+
+
+def search_candidates(
+    session: Session,
+    query: str,
+    vector: list[float],
+    category_code: CategoryCode | None,
+    keyword_limit: int,
+    semantic_limit: int,
+) -> list[Mapping[str, Any]]:
+    view = REPORT_READ_VIEW
+    keyword_match = or_(
+        view.c.title.icontains(query, autoescape=True),
+        view.c.overview.icontains(query, autoescape=True),
+        view.c.content.icontains(query, autoescape=True),
+    )
+    distance = ReportEmbedding.embedding.cosine_distance(vector)
+    candidates = (
+        select(
+            view.c.report_id,
+            view.c.title,
+            view.c.category_code,
+            view.c.overview,
+            keyword_match.label("keyword_match"),
+            (1 - distance).label("cosine_similarity"),
+        )
+        .select_from(view.join(Report, view.c.report_id == Report.report_id))
+        .join(ReportEmbedding, Report.report_id == ReportEmbedding.report_id)
+        .where(Report.index_status == "ready", ReportEmbedding.indexed_revision == Report.revision)
+    )
+    if category_code is not None:
+        candidates = candidates.where(view.c.category_code == category_code)
+
+    ranked = candidates.order_by(distance, view.c.report_id)
+    keywords = ranked.where(keyword_match).limit(keyword_limit).subquery()
+    semantic = ranked.limit(semantic_limit).subquery()
+    statement = select(keywords).union(select(semantic))
+    return list(session.execute(statement).mappings())
+
+
+def list_report_ids(session: Session) -> list[int]:
+    return list(session.scalars(select(Report.report_id).order_by(Report.report_id)))
+
+
+def lock_report(session: Session, report_id: int) -> Report | None:
+    return session.get(Report, report_id, with_for_update=True)
 
 
 def delete_report(session: Session, report_id: int) -> bool:

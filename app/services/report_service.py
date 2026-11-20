@@ -109,6 +109,35 @@ def delete_report(session: Session, report_id: int) -> bool:
         return report_repository.delete_report(session, report_id)
 
 
+def index_overview(session: Session, report_id: int) -> bool:
+    with session.begin():
+        report = report_repository.lock_report(session, report_id)
+        if report is None:
+            return False
+
+        overview_hash = sha256(report.overview.encode("utf-8")).hexdigest()
+        embedding = report_repository.find_embedding(session, report_id)
+        if (
+            report.index_status == "ready"
+            and embedding is not None
+            and embedding.indexed_revision == report.revision
+            and embedding.overview_hash == overview_hash
+            and embedding.model_name == settings.embedding_model
+        ):
+            return False
+
+        vector = encode_overview(report.overview)
+        if embedding is None:
+            embedding = report_repository.add_embedding(session, report_id)
+        embedding.embedding = vector
+        embedding.overview_hash = overview_hash
+        embedding.model_name = settings.embedding_model
+        embedding.indexed_at = datetime.now(UTC)
+        embedding.indexed_revision = report.revision
+        report.index_status = "ready"
+    return True
+
+
 def update_report(
     session: Session, report_id: int, request: ReportUpdate
 ) -> ReportUpdateResponse | None:
