@@ -106,7 +106,10 @@ def summarize_report(
         content = detail.content
         source_revision = report.revision
 
-    summary, model = llm_client.summarize(content, request.max_sentences)
+    if request.style == "structured":
+        summary, model = llm_client.summarize_structured(content, request.max_sentences)
+    else:
+        summary, model = llm_client.summarize(content, request.max_sentences)
     return ReportSummaryResponse(
         report_id=report_id,
         source_revision=source_revision,

@@ -175,14 +175,23 @@ class ReportListResponse(BaseModel):
 
 
 class ReportSummaryRequest(BaseModel):
-    style: Literal["brief"]
+    style: Literal["brief", "structured"]
     max_sentences: int = Field(default=3, ge=1, le=10)
+
+
+class StructuredSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    purpose: NonBlankText
+    key_points: list[NonBlankText] = Field(min_length=1)
+    conclusion: NonBlankText
+    limitations: NonBlankText
 
 
 class ReportSummaryResponse(BaseModel):
     report_id: int
     source_revision: int
-    summary: str
+    summary: str | StructuredSummary
     model: str
     status: Literal["completed"] = "completed"
 
