@@ -4,12 +4,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from api.agent import router as agent_router
+from api.error_handlers import register_error_handlers
 from api.reports import router as reports_router
 from api.search import router as search_router
 from db.session import get_engine
 
 
 app = FastAPI(title="Report Agent", version="1.4")
+register_error_handlers(app)
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(agent_router, prefix="/api/v1")

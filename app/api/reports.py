@@ -3,12 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import AwareDatetime, ValidationError
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from api.error_handlers import error_response
 from db.session import get_session
-from integrations.embedding_client import EmbeddingUnavailable
-from integrations.llm_client import LLMTimeout, LLMUnavailable
 from schemas.report import (
     CategoryCode,
     CategoryListResponse,
@@ -55,14 +53,6 @@ def create_report(
         return report_service.create_report(session, request)
     except report_service.CategoryNotFound as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category code") from error
-    except EmbeddingUnavailable as error:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, "Embedding unavailable"
-        ) from error
-    except SQLAlchemyError as error:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Database write failed"
-        ) from error
 
 
 @router.get("/reports")
@@ -116,14 +106,6 @@ def update_report(
         ) from error
     except report_service.PromptContentChange as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
-    except EmbeddingUnavailable as error:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, "Embedding unavailable"
-        ) from error
-    except SQLAlchemyError as error:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Database write failed"
-        ) from error
     if report is None:
         return report_not_found()
     return report
@@ -158,12 +140,7 @@ def summarize_report(
     request: ReportSummaryRequest,
     session: Annotated[Session, Depends(get_session)],
 ) -> ReportSummaryResponse | JSONResponse:
-    try:
-        summary = report_service.summarize_report(session, report_id, request)
-    except LLMTimeout as error:
-        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, "LLM request timed out") from error
-    except LLMUnavailable as error:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM unavailable") from error
+    summary = report_service.summarize_report(session, report_id, request)
     if summary is None:
         return report_not_found()
     return summary
@@ -208,20 +185,8 @@ def list_prompt_versions(
 
 
 def not_prompt_report(message: str) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"error": {"code": "NOT_PROMPT_REPORT", "message": message, "details": {}}},
-    )
+    return error_response(422, "NOT_PROMPT_REPORT", message)
 
 
 def report_not_found() -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND,
-        content={
-            "error": {
-                "code": "REPORT_NOT_FOUND",
-                "message": "요청한 보고서를 찾을 수 없습니다.",
-                "details": {},
-            }
-        },
-    )
+    return error_response(404, "REPORT_NOT_FOUND", "요청한 보고서를 찾을 수 없습니다.")
