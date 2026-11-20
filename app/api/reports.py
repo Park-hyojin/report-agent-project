@@ -1,13 +1,19 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from db.session import get_session
 from integrations.embedding_client import EmbeddingUnavailable
-from schemas.report import CategoryListResponse, ReportCreate, ReportCreateResponse, ReportDetailResponse
+from schemas.report import (
+    CategoryListResponse,
+    ReportCreate,
+    ReportCreateResponse,
+    ReportDetailResponse,
+    ReportListResponse,
+)
 from services import report_service
 
 
@@ -47,6 +53,16 @@ def create_report(
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Database write failed"
         ) from error
+
+
+@router.get("/reports")
+def list_reports(
+    session: Annotated[Session, Depends(get_session)],
+    title: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, le=2**63 - 1)] = 0,
+) -> ReportListResponse:
+    return report_service.list_reports(session, title, limit, offset)
 
 
 @router.get(

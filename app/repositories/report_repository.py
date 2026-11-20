@@ -1,4 +1,7 @@
-from sqlalchemy import select
+from collections.abc import Mapping
+from typing import Any
+
+from sqlalchemy import column, func, select, table
 from sqlalchemy.orm import Session
 
 from models.report import (
@@ -26,6 +29,15 @@ DETAIL_MODELS: dict[CategoryCode, type[ReportDetail]] = {
     "MEETING": MeetingMinutes,
 }
 
+REPORT_READ_VIEW = table(
+    "report_read_view",
+    column("report_id"),
+    column("category_code"),
+    column("title"),
+    column("revision"),
+    column("update_at"),
+)
+
 
 def list_categories(session: Session) -> list[ReportCategory]:
     statement = select(ReportCategory).order_by(ReportCategory.category_id)
@@ -35,6 +47,26 @@ def list_categories(session: Session) -> list[ReportCategory]:
 def find_category(session: Session, code: CategoryCode) -> ReportCategory | None:
     statement = select(ReportCategory).where(ReportCategory.code == code)
     return session.scalars(statement).one_or_none()
+
+
+def list_reports(
+    session: Session, title: str | None, limit: int, offset: int
+) -> tuple[list[Mapping[str, Any]], int]:
+    view = REPORT_READ_VIEW
+    matches = select(
+        view.c.report_id, view.c.category_code, view.c.title, view.c.revision, view.c.update_at
+    )
+    if title is not None:
+        matches = matches.where(view.c.title.icontains(title, autoescape=True))
+
+    total = session.execute(select(func.count()).select_from(matches.subquery())).scalar_one()
+    page = (
+        matches.with_only_columns(view.c.report_id, view.c.category_code, view.c.title, view.c.revision)
+        .order_by(view.c.update_at.desc(), view.c.report_id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(session.execute(page).mappings()), total
 
 
 def find_report(

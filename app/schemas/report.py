@@ -141,3 +141,17 @@ class ReportDetailResponse(BaseModel):
     @classmethod
     def normalize_timestamp(cls, value: datetime) -> datetime:
         return value.astimezone(UTC)
+
+
+class ReportListItem(BaseModel):
+    report_id: int
+    category_code: CategoryCode
+    title: str
+    revision: int
+
+
+class ReportListResponse(BaseModel):
+    items: list[ReportListItem]
+    total: int
+    limit: int
+    offset: int

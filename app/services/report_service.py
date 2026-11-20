@@ -7,7 +7,14 @@ from core.config import settings
 from integrations import embedding_client
 from models.report import PromptReport, ReportCategory
 from repositories import report_repository
-from schemas.report import DETAIL_TYPES, ReportCreate, ReportCreateResponse, ReportDetailResponse
+from schemas.report import (
+    DETAIL_TYPES,
+    ReportCreate,
+    ReportCreateResponse,
+    ReportDetailResponse,
+    ReportListItem,
+    ReportListResponse,
+)
 
 
 class CategoryNotFound(ValueError):
@@ -16,6 +23,18 @@ class CategoryNotFound(ValueError):
 
 def list_categories(session: Session) -> list[ReportCategory]:
     return report_repository.list_categories(session)
+
+
+def list_reports(
+    session: Session, title: str | None, limit: int, offset: int
+) -> ReportListResponse:
+    rows, total = report_repository.list_reports(session, title, limit, offset)
+    return ReportListResponse(
+        items=[ReportListItem.model_validate(row) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 def encode_overview(overview: str) -> list[float]:
