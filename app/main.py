@@ -3,10 +3,12 @@ from fastapi import FastAPI, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from api.reports import router as reports_router
 from db.session import get_engine
 
 
 app = FastAPI(title="Report Agent", version="1.4")
+app.include_router(reports_router, prefix="/api/v1")
 
 
 @app.get("/health", responses={503: {"description": "Database or pgvector unavailable"}})
