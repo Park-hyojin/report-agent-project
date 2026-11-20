@@ -24,14 +24,23 @@ class SummarizeReportAction(BaseModel):
     report_id: ReportId
 
 
+class SearchAndSummarizeAction(BaseModel):
+    action: Literal["search_and_summarize"]
+    query: SearchQuery
+
+
 AgentRequest = Annotated[
-    GetReportAction | FindReportAction | SummarizeReportAction,
+    GetReportAction | FindReportAction | SummarizeReportAction | SearchAndSummarizeAction,
     Field(discriminator="action"),
 ]
 
 
+class SearchAndSummarizeResult(SimilarSearchResponse):
+    summary: ReportSummaryResponse
+
+
 class AgentResponse(BaseModel):
-    action: Literal["get_report", "find_report", "summarize_report"]
+    action: Literal["get_report", "find_report", "summarize_report", "search_and_summarize"]
     status: Literal["completed"] = "completed"
     tool_calls: list[Literal["get_report", "find_similar_report", "summarize_report"]]
-    data: ReportDetailResponse | SimilarSearchResponse | ReportSummaryResponse
+    data: ReportDetailResponse | SearchAndSummarizeResult | SimilarSearchResponse | ReportSummaryResponse
