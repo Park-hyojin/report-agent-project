@@ -8,12 +8,15 @@ from sqlalchemy.orm import Session
 
 from db.session import get_session
 from integrations.embedding_client import EmbeddingUnavailable
+from integrations.llm_client import LLMTimeout, LLMUnavailable
 from schemas.report import (
     CategoryListResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetailResponse,
     ReportListResponse,
+    ReportSummaryRequest,
+    ReportSummaryResponse,
     ReportUpdate,
     ReportUpdateResponse,
 )
@@ -131,6 +134,31 @@ def delete_report(
     if not report_service.delete_report(session, report_id):
         return report_not_found()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/reports/{report_id}/summarize",
+    response_model=ReportSummaryResponse,
+    responses={
+        404: {"description": "Report not found"},
+        503: {"description": "LLM unavailable"},
+        504: {"description": "LLM request timed out"},
+    },
+)
+def summarize_report(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    request: ReportSummaryRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> ReportSummaryResponse | JSONResponse:
+    try:
+        summary = report_service.summarize_report(session, report_id, request)
+    except LLMTimeout as error:
+        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, "LLM request timed out") from error
+    except LLMUnavailable as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM unavailable") from error
+    if summary is None:
+        return report_not_found()
+    return summary
 
 
 def report_not_found() -> JSONResponse:

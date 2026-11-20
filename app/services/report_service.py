@@ -4,7 +4,7 @@ from hashlib import sha256
 from sqlalchemy.orm import Session
 
 from core.config import settings
-from integrations import embedding_client
+from integrations import embedding_client, llm_client
 from models.report import PromptReport, ReportCategory
 from repositories import report_repository
 from schemas.report import (
@@ -14,6 +14,8 @@ from schemas.report import (
     ReportDetailResponse,
     ReportListItem,
     ReportListResponse,
+    ReportSummaryRequest,
+    ReportSummaryResponse,
     ReportUpdate,
     ReportUpdateResponse,
 )
@@ -73,6 +75,26 @@ def get_report(session: Session, report_id: int) -> ReportDetailResponse | None:
         index_status=report.index_status,
         created_at=detail.create_at,
         updated_at=detail.update_at,
+    )
+
+
+def summarize_report(
+    session: Session, report_id: int, request: ReportSummaryRequest
+) -> ReportSummaryResponse | None:
+    with session.begin():
+        result = report_repository.find_report(session, report_id, for_update=True)
+        if result is None:
+            return None
+        report, _, detail = result
+        content = detail.content
+        source_revision = report.revision
+
+    summary, model = llm_client.summarize(content, request.max_sentences)
+    return ReportSummaryResponse(
+        report_id=report_id,
+        source_revision=source_revision,
+        summary=summary,
+        model=model,
     )
 
 

@@ -5,6 +5,7 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     ConfigDict,
+    Field,
     StringConstraints,
     ValidationInfo,
     field_validator,
@@ -171,3 +172,16 @@ class ReportListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ReportSummaryRequest(BaseModel):
+    style: Literal["brief"]
+    max_sentences: int = Field(default=3, ge=1, le=10)
+
+
+class ReportSummaryResponse(BaseModel):
+    report_id: int
+    source_revision: int
+    summary: str
+    model: str
+    status: Literal["completed"] = "completed"
