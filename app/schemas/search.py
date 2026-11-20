@@ -22,6 +22,9 @@ class SearchMatch(BaseModel):
     overview: str
     keyword_match: bool
     cosine_similarity: float
+    keyword_score: Literal[0, 1]
+    semantic_score: float
+    selection_reason: Literal["keyword_match", "semantic_threshold"]
 
 
 class SimilarSearchResponse(BaseModel):

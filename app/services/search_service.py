@@ -23,8 +23,18 @@ def search_similar(session: Session, request: SimilarSearchRequest) -> SimilarSe
         ),
         default=None,
     )
+    match = None
+    if best is not None:
+        keyword_match = best["keyword_match"]
+        match = SearchMatch.model_validate({
+            **best,
+            "keyword_score": int(keyword_match),
+            "semantic_score": best["cosine_similarity"],
+            "selection_reason": "keyword_match" if keyword_match else "semantic_threshold",
+        })
+
     return SimilarSearchResponse(
         status="found" if best is not None else "not_found",
         query=request.query,
-        best_match=SearchMatch.model_validate(best) if best is not None else None,
+        best_match=match,
     )
