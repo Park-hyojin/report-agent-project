@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -116,6 +116,21 @@ def update_report(
     if report is None:
         return report_not_found()
     return report
+
+
+@router.delete(
+    "/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={404: {"description": "Report not found"}},
+)
+def delete_report(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    if not report_service.delete_report(session, report_id):
+        return report_not_found()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def report_not_found() -> JSONResponse:

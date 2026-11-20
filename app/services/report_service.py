@@ -104,6 +104,11 @@ def create_report(session: Session, request: ReportCreate) -> ReportCreateRespon
     return result
 
 
+def delete_report(session: Session, report_id: int) -> bool:
+    with session.begin():
+        return report_repository.delete_report(session, report_id)
+
+
 def update_report(
     session: Session, report_id: int, request: ReportUpdate
 ) -> ReportUpdateResponse | None:

@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import column, func, select, table
+from sqlalchemy import column, delete, func, select, table
 from sqlalchemy.orm import Session
 
 from models.report import (
@@ -88,6 +88,11 @@ def find_report(
     if detail is None:
         raise RuntimeError(f"Report {report_id} has no detail row")
     return report, category_code, detail
+
+
+def delete_report(session: Session, report_id: int) -> bool:
+    statement = delete(Report).where(Report.report_id == report_id).returning(Report.report_id)
+    return session.execute(statement).scalar_one_or_none() is not None
 
 
 def find_embedding(session: Session, report_id: int) -> ReportEmbedding | None:
