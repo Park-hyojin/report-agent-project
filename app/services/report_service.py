@@ -14,10 +14,16 @@ from schemas.report import (
     ReportDetailResponse,
     ReportListItem,
     ReportListResponse,
+    ReportUpdate,
+    ReportUpdateResponse,
 )
 
 
 class CategoryNotFound(ValueError):
+    pass
+
+
+class PromptContentChange(ValueError):
     pass
 
 
@@ -94,5 +100,53 @@ def create_report(session: Session, request: ReportCreate) -> ReportCreateRespon
             revision=report.revision,
             index_status="ready",
             embedding_model=model_name,
+        )
+    return result
+
+
+def update_report(
+    session: Session, report_id: int, request: ReportUpdate
+) -> ReportUpdateResponse | None:
+    with session.begin():
+        current = report_repository.find_report(session, report_id, for_update=True)
+        if current is None:
+            return None
+
+        report, category_code, detail = current
+        details = DETAIL_TYPES[category_code].model_validate(request.details)
+        detail_fields = details.model_dump(exclude={"prompt_text"})
+        if isinstance(detail, PromptReport) and (
+            request.content != detail.content or request.details.get("prompt_text") != detail.content
+        ):
+            raise PromptContentChange("Prompt content must match the active version")
+
+        embedding = report_repository.find_embedding(session, report_id)
+        embedding_updated = embedding is None or report.overview != request.overview
+        if embedding_updated:
+            vector = encode_overview(request.overview)
+            if embedding is None:
+                embedding = report_repository.add_embedding(session, report_id)
+            embedding.embedding = vector
+            embedding.model_name = settings.embedding_model
+            embedding.overview_hash = sha256(request.overview.encode("utf-8")).hexdigest()
+            embedding.indexed_at = datetime.now(UTC)
+
+        report.overview = request.overview
+        report.revision += 1
+        report.index_status = "ready"
+        embedding.indexed_revision = report.revision
+
+        detail.title = request.title
+        detail.author = request.author
+        detail.content = request.content
+        detail.update_at = datetime.now(UTC)
+        for field_name, value in detail_fields.items():
+            setattr(detail, field_name, value)
+
+        result = ReportUpdateResponse(
+            report_id=report_id,
+            revision=report.revision,
+            index_status="ready",
+            embedding_updated=embedding_updated,
         )
     return result

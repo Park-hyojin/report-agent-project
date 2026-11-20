@@ -84,12 +84,15 @@ DETAIL_TYPES: dict[CategoryCode, type[ReportDetails]] = {
 }
 
 
-class ReportCreate(BaseModel):
-    category_code: CategoryCode
+class ReportFields(BaseModel):
     title: Title
     author: Author
     content: Content
     overview: Overview
+
+
+class ReportCreate(ReportFields):
+    category_code: CategoryCode
     details: (
         ExperimentDetails
         | DailyWorkDetails
@@ -122,6 +125,19 @@ class ReportCreateResponse(BaseModel):
     revision: int
     index_status: Literal["ready"]
     embedding_model: str
+
+
+class ReportUpdate(ReportFields):
+    model_config = ConfigDict(extra="forbid")
+
+    details: dict[str, object]
+
+
+class ReportUpdateResponse(BaseModel):
+    report_id: int
+    revision: int
+    index_status: Literal["ready"]
+    embedding_updated: bool
 
 
 class ReportDetailResponse(BaseModel):

@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,8 @@ from schemas.report import (
     ReportCreateResponse,
     ReportDetailResponse,
     ReportListResponse,
+    ReportUpdate,
+    ReportUpdateResponse,
 )
 from services import report_service
 
@@ -76,14 +79,53 @@ def get_report(
 ) -> ReportDetailResponse | JSONResponse:
     report = report_service.get_report(session, report_id)
     if report is None:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={
-                "error": {
-                    "code": "REPORT_NOT_FOUND",
-                    "message": "요청한 보고서를 찾을 수 없습니다.",
-                    "details": {},
-                }
-            },
-        )
+        return report_not_found()
     return report
+
+
+@router.put(
+    "/reports/{report_id}",
+    response_model=ReportUpdateResponse,
+    responses={
+        404: {"description": "Report not found"},
+        500: {"description": "Database write failed"},
+        503: {"description": "Embedding unavailable"},
+    },
+)
+def update_report(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    request: ReportUpdate,
+    session: Annotated[Session, Depends(get_session)],
+) -> ReportUpdateResponse | JSONResponse:
+    try:
+        report = report_service.update_report(session, report_id, request)
+    except ValidationError as error:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid details for the report category"
+        ) from error
+    except report_service.PromptContentChange as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    except EmbeddingUnavailable as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Embedding unavailable"
+        ) from error
+    except SQLAlchemyError as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "Database write failed"
+        ) from error
+    if report is None:
+        return report_not_found()
+    return report
+
+
+def report_not_found() -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "error": {
+                "code": "REPORT_NOT_FOUND",
+                "message": "요청한 보고서를 찾을 수 없습니다.",
+                "details": {},
+            }
+        },
+    )

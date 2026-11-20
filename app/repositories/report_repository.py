@@ -70,13 +70,15 @@ def list_reports(
 
 
 def find_report(
-    session: Session, report_id: int
+    session: Session, report_id: int, *, for_update: bool = False
 ) -> tuple[Report, str, ReportDetail] | None:
     statement = (
         select(Report, ReportCategory.code)
         .join(ReportCategory, Report.category_id == ReportCategory.category_id)
         .where(Report.report_id == report_id)
     )
+    if for_update:
+        statement = statement.with_for_update(of=Report)
     row = session.execute(statement).one_or_none()
     if row is None:
         return None
@@ -86,6 +88,16 @@ def find_report(
     if detail is None:
         raise RuntimeError(f"Report {report_id} has no detail row")
     return report, category_code, detail
+
+
+def find_embedding(session: Session, report_id: int) -> ReportEmbedding | None:
+    return session.get(ReportEmbedding, report_id)
+
+
+def add_embedding(session: Session, report_id: int) -> ReportEmbedding:
+    embedding = ReportEmbedding(report_id=report_id)
+    session.add(embedding)
+    return embedding
 
 
 def insert_report(
