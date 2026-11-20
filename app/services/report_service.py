@@ -1,12 +1,13 @@
+from datetime import UTC, datetime
 from hashlib import sha256
 
 from sqlalchemy.orm import Session
 
 from core.config import settings
 from integrations import embedding_client
-from models.report import ReportCategory
+from models.report import PromptReport, ReportCategory
 from repositories import report_repository
-from schemas.report import ReportCreate, ReportCreateResponse
+from schemas.report import DETAIL_TYPES, ReportCreate, ReportCreateResponse, ReportDetailResponse
 
 
 class CategoryNotFound(ValueError):
@@ -19,6 +20,35 @@ def list_categories(session: Session) -> list[ReportCategory]:
 
 def encode_overview(overview: str) -> list[float]:
     return embedding_client.encode(f"passage: {overview}")
+
+
+def get_report(session: Session, report_id: int) -> ReportDetailResponse | None:
+    result = report_repository.find_report(session, report_id)
+    if result is None:
+        return None
+
+    report, category_code, detail = result
+    details = {}
+    for field_name in DETAIL_TYPES[category_code].model_fields:
+        if field_name == "prompt_text" and isinstance(detail, PromptReport):
+            details[field_name] = detail.content
+            continue
+        value = getattr(detail, field_name)
+        details[field_name] = value.astimezone(UTC) if isinstance(value, datetime) else value
+
+    return ReportDetailResponse(
+        report_id=report.report_id,
+        category_code=category_code,
+        title=detail.title,
+        content=detail.content,
+        author=detail.author,
+        overview=report.overview,
+        details=details,
+        revision=report.revision,
+        index_status=report.index_status,
+        created_at=detail.create_at,
+        updated_at=detail.update_at,
+    )
 
 
 def create_report(session: Session, request: ReportCreate) -> ReportCreateResponse:

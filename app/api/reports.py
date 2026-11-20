@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from db.session import get_session
 from integrations.embedding_client import EmbeddingUnavailable
-from schemas.report import CategoryListResponse, ReportCreate, ReportCreateResponse
+from schemas.report import CategoryListResponse, ReportCreate, ReportCreateResponse, ReportDetailResponse
 from services import report_service
 
 
@@ -46,3 +47,27 @@ def create_report(
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Database write failed"
         ) from error
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=ReportDetailResponse,
+    responses={404: {"description": "Report not found"}},
+)
+def get_report(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    session: Annotated[Session, Depends(get_session)],
+) -> ReportDetailResponse | JSONResponse:
+    report = report_service.get_report(session, report_id)
+    if report is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "error": {
+                    "code": "REPORT_NOT_FOUND",
+                    "message": "요청한 보고서를 찾을 수 없습니다.",
+                    "details": {},
+                }
+            },
+        )
+    return report

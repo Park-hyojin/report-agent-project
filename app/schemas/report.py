@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Literal, Self
 
 from pydantic import (
@@ -122,3 +122,22 @@ class ReportCreateResponse(BaseModel):
     revision: int
     index_status: Literal["ready"]
     embedding_model: str
+
+
+class ReportDetailResponse(BaseModel):
+    report_id: int
+    category_code: CategoryCode
+    title: str
+    content: str
+    author: str
+    overview: str
+    details: dict[str, str | date | datetime]
+    revision: int
+    index_status: Literal["pending", "ready", "failed"]
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def normalize_timestamp(cls, value: datetime) -> datetime:
+        return value.astimezone(UTC)

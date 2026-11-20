@@ -37,6 +37,25 @@ def find_category(session: Session, code: CategoryCode) -> ReportCategory | None
     return session.scalars(statement).one_or_none()
 
 
+def find_report(
+    session: Session, report_id: int
+) -> tuple[Report, str, ReportDetail] | None:
+    statement = (
+        select(Report, ReportCategory.code)
+        .join(ReportCategory, Report.category_id == ReportCategory.category_id)
+        .where(Report.report_id == report_id)
+    )
+    row = session.execute(statement).one_or_none()
+    if row is None:
+        return None
+
+    report, category_code = row
+    detail = session.get(DETAIL_MODELS[category_code], report_id)
+    if detail is None:
+        raise RuntimeError(f"Report {report_id} has no detail row")
+    return report, category_code, detail
+
+
 def insert_report(
     session: Session,
     category_id: int,
