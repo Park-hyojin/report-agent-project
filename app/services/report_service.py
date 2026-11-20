@@ -9,6 +9,8 @@ from models.report import PromptReport, ReportCategory
 from repositories import report_repository
 from schemas.report import (
     DETAIL_TYPES,
+    PromptVersionCreate,
+    PromptVersionCreateResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetailResponse,
@@ -26,6 +28,10 @@ class CategoryNotFound(ValueError):
 
 
 class PromptContentChange(ValueError):
+    pass
+
+
+class NotPromptReport(ValueError):
     pass
 
 
@@ -124,6 +130,23 @@ def create_report(session: Session, request: ReportCreate) -> ReportCreateRespon
             embedding_model=model_name,
         )
     return result
+
+
+def create_prompt_version(
+    session: Session, report_id: int, request: PromptVersionCreate
+) -> PromptVersionCreateResponse | None:
+    with session.begin():
+        result = report_repository.find_report(session, report_id, for_update=True)
+        if result is None:
+            return None
+        _, category_code, _ = result
+        if category_code != "PROMPT":
+            raise NotPromptReport
+
+        version_no = report_repository.insert_prompt_version(
+            session, report_id, request.prompt_text
+        )
+    return PromptVersionCreateResponse(version_no=version_no)
 
 
 def delete_report(session: Session, report_id: int) -> bool:

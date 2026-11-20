@@ -138,6 +138,16 @@ def lock_report(session: Session, report_id: int) -> Report | None:
     return session.get(Report, report_id, with_for_update=True)
 
 
+def insert_prompt_version(session: Session, report_id: int, prompt_text: str) -> int:
+    statement = select(func.max(PromptVersion.version_no)).where(
+        PromptVersion.report_id == report_id
+    )
+    latest_version = session.execute(statement).scalar_one()
+    version_no = (latest_version or 0) + 1
+    session.add(PromptVersion(report_id=report_id, version_no=version_no, prompt_text=prompt_text))
+    return version_no
+
+
 def delete_report(session: Session, report_id: int) -> bool:
     statement = delete(Report).where(Report.report_id == report_id).returning(Report.report_id)
     return session.execute(statement).scalar_one_or_none() is not None

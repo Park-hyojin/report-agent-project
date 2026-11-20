@@ -11,6 +11,8 @@ from integrations.embedding_client import EmbeddingUnavailable
 from integrations.llm_client import LLMTimeout, LLMUnavailable
 from schemas.report import (
     CategoryListResponse,
+    PromptVersionCreate,
+    PromptVersionCreateResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetailResponse,
@@ -159,6 +161,35 @@ def summarize_report(
     if summary is None:
         return report_not_found()
     return summary
+
+
+@router.post(
+    "/prompts/{report_id}/versions",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PromptVersionCreateResponse,
+    responses={404: {"description": "Report not found"}},
+)
+def create_prompt_version(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    request: PromptVersionCreate,
+    session: Annotated[Session, Depends(get_session)],
+) -> PromptVersionCreateResponse | JSONResponse:
+    try:
+        version = report_service.create_prompt_version(session, report_id, request)
+    except report_service.NotPromptReport:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={
+                "error": {
+                    "code": "NOT_PROMPT_REPORT",
+                    "message": "프롬프트 보고서만 버전을 추가할 수 있습니다.",
+                    "details": {},
+                }
+            },
+        )
+    if version is None:
+        return report_not_found()
+    return version
 
 
 def report_not_found() -> JSONResponse:

@@ -185,3 +185,12 @@ class ReportSummaryResponse(BaseModel):
     summary: str
     model: str
     status: Literal["completed"] = "completed"
+
+
+class PromptVersionCreate(BaseModel):
+    prompt_text: Content
+
+
+class PromptVersionCreateResponse(BaseModel):
+    version_no: int
+    active: Literal[False] = False
