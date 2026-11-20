@@ -1,3 +1,5 @@
+""" 실행 : python -m pytest -q -p no:cacheprovider tests/test_search_threshold.py"""
+
 import sys
 from pathlib import Path
 from unittest.mock import Mock
