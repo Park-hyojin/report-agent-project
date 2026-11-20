@@ -13,6 +13,7 @@ from schemas.report import (
     CategoryListResponse,
     PromptVersionCreate,
     PromptVersionCreateResponse,
+    PromptVersionListResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetailResponse,
@@ -177,19 +178,35 @@ def create_prompt_version(
     try:
         version = report_service.create_prompt_version(session, report_id, request)
     except report_service.NotPromptReport:
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={
-                "error": {
-                    "code": "NOT_PROMPT_REPORT",
-                    "message": "프롬프트 보고서만 버전을 추가할 수 있습니다.",
-                    "details": {},
-                }
-            },
-        )
+        return not_prompt_report("프롬프트 보고서만 버전을 추가할 수 있습니다.")
     if version is None:
         return report_not_found()
     return version
+
+
+@router.get(
+    "/prompts/{report_id}/versions",
+    response_model=PromptVersionListResponse,
+    responses={404: {"description": "Report not found"}},
+)
+def list_prompt_versions(
+    report_id: Annotated[int, Path(gt=0, le=2**63 - 1)],
+    session: Annotated[Session, Depends(get_session)],
+) -> PromptVersionListResponse | JSONResponse:
+    try:
+        versions = report_service.list_prompt_versions(session, report_id)
+    except report_service.NotPromptReport:
+        return not_prompt_report("프롬프트 보고서만 버전을 조회할 수 있습니다.")
+    if versions is None:
+        return report_not_found()
+    return versions
+
+
+def not_prompt_report(message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"error": {"code": "NOT_PROMPT_REPORT", "message": message, "details": {}}},
+    )
 
 
 def report_not_found() -> JSONResponse:

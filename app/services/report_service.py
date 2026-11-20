@@ -11,6 +11,8 @@ from schemas.report import (
     DETAIL_TYPES,
     PromptVersionCreate,
     PromptVersionCreateResponse,
+    PromptVersionItem,
+    PromptVersionListResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetailResponse,
@@ -132,16 +134,35 @@ def create_report(session: Session, request: ReportCreate) -> ReportCreateRespon
     return result
 
 
+def find_prompt_report(
+    session: Session, report_id: int, *, for_update: bool = False
+) -> PromptReport | None:
+    result = report_repository.find_report(session, report_id, for_update=for_update)
+    if result is None:
+        return None
+    _, _, detail = result
+    if not isinstance(detail, PromptReport):
+        raise NotPromptReport
+    return detail
+
+
+def list_prompt_versions(session: Session, report_id: int) -> PromptVersionListResponse | None:
+    prompt = find_prompt_report(session, report_id)
+    if prompt is None:
+        return None
+    versions = report_repository.list_prompt_versions(session, report_id)
+    return PromptVersionListResponse(
+        items=[PromptVersionItem.model_validate(version) for version in versions],
+        active_version_no=prompt.active_version_no,
+    )
+
+
 def create_prompt_version(
     session: Session, report_id: int, request: PromptVersionCreate
 ) -> PromptVersionCreateResponse | None:
     with session.begin():
-        result = report_repository.find_report(session, report_id, for_update=True)
-        if result is None:
+        if find_prompt_report(session, report_id, for_update=True) is None:
             return None
-        _, category_code, _ = result
-        if category_code != "PROMPT":
-            raise NotPromptReport
 
         version_no = report_repository.insert_prompt_version(
             session, report_id, request.prompt_text

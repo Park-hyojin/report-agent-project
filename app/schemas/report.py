@@ -194,3 +194,20 @@ class PromptVersionCreate(BaseModel):
 class PromptVersionCreateResponse(BaseModel):
     version_no: int
     active: Literal[False] = False
+
+
+class PromptVersionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    version_no: int
+    created_at: datetime
+
+    @field_validator("created_at")
+    @classmethod
+    def normalize_timestamp(cls, value: datetime) -> datetime:
+        return value.astimezone(UTC)
+
+
+class PromptVersionListResponse(BaseModel):
+    items: list[PromptVersionItem]
+    active_version_no: int

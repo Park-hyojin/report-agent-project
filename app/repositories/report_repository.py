@@ -138,6 +138,15 @@ def lock_report(session: Session, report_id: int) -> Report | None:
     return session.get(Report, report_id, with_for_update=True)
 
 
+def list_prompt_versions(session: Session, report_id: int) -> list[Mapping[str, Any]]:
+    statement = (
+        select(PromptVersion.version_no, PromptVersion.created_at)
+        .where(PromptVersion.report_id == report_id)
+        .order_by(PromptVersion.version_no)
+    )
+    return list(session.execute(statement).mappings())
+
+
 def insert_prompt_version(session: Session, report_id: int, prompt_text: str) -> int:
     statement = select(func.max(PromptVersion.version_no)).where(
         PromptVersion.report_id == report_id
