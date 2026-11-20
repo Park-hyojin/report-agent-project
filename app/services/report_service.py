@@ -9,6 +9,7 @@ from models.report import PromptReport, ReportCategory
 from repositories import report_repository
 from schemas.report import (
     DETAIL_TYPES,
+    CategoryCode,
     PromptVersionCreate,
     PromptVersionCreateResponse,
     PromptVersionItem,
@@ -42,9 +43,17 @@ def list_categories(session: Session) -> list[ReportCategory]:
 
 
 def list_reports(
-    session: Session, title: str | None, limit: int, offset: int
+    session: Session,
+    title: str | None,
+    limit: int,
+    offset: int,
+    *,
+    category_code: CategoryCode | None = None,
+    updated_after: datetime | None = None,
 ) -> ReportListResponse:
-    rows, total = report_repository.list_reports(session, title, limit, offset)
+    rows, total = report_repository.list_reports(
+        session, title, limit, offset, category_code=category_code, updated_after=updated_after
+    )
     return ReportListResponse(
         items=[ReportListItem.model_validate(row) for row in rows],
         total=total,

@@ -1,7 +1,8 @@
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import column, delete, func, or_, select, table
+from sqlalchemy import DateTime, column, delete, func, or_, select, table
 from sqlalchemy.orm import Session
 
 from models.report import (
@@ -37,7 +38,7 @@ REPORT_READ_VIEW = table(
     column("content"),
     column("overview"),
     column("revision"),
-    column("update_at"),
+    column("update_at", DateTime(timezone=True)),
 )
 
 
@@ -52,7 +53,13 @@ def find_category(session: Session, code: CategoryCode) -> ReportCategory | None
 
 
 def list_reports(
-    session: Session, title: str | None, limit: int, offset: int
+    session: Session,
+    title: str | None,
+    limit: int,
+    offset: int,
+    *,
+    category_code: CategoryCode | None = None,
+    updated_after: datetime | None = None,
 ) -> tuple[list[Mapping[str, Any]], int]:
     view = REPORT_READ_VIEW
     matches = select(
@@ -60,6 +67,10 @@ def list_reports(
     )
     if title is not None:
         matches = matches.where(view.c.title.icontains(title, autoescape=True))
+    if category_code is not None:
+        matches = matches.where(view.c.category_code == category_code)
+    if updated_after is not None:
+        matches = matches.where(view.c.update_at > updated_after)
 
     total = session.execute(select(func.count()).select_from(matches.subquery())).scalar_one()
     page = (

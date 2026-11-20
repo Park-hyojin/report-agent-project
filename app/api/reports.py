@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.responses import JSONResponse, Response
-from pydantic import ValidationError
+from pydantic import AwareDatetime, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from db.session import get_session
 from integrations.embedding_client import EmbeddingUnavailable
 from integrations.llm_client import LLMTimeout, LLMUnavailable
 from schemas.report import (
+    CategoryCode,
     CategoryListResponse,
     PromptVersionCreate,
     PromptVersionCreateResponse,
@@ -70,8 +71,12 @@ def list_reports(
     title: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0, le=2**63 - 1)] = 0,
+    category_code: CategoryCode | None = None,
+    updated_after: AwareDatetime | None = None,
 ) -> ReportListResponse:
-    return report_service.list_reports(session, title, limit, offset)
+    return report_service.list_reports(
+        session, title, limit, offset, category_code=category_code, updated_after=updated_after
+    )
 
 
 @router.get(
