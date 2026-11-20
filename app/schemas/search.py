@@ -5,8 +5,11 @@ from pydantic import BaseModel, Field, StringConstraints
 from schemas.report import CategoryCode
 
 
+SearchQuery = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
 class SimilarSearchRequest(BaseModel):
-    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    query: SearchQuery
     category_code: CategoryCode | None = None
     keyword_limit: int = Field(default=20, ge=1, le=100)
     semantic_limit: int = Field(default=20, ge=1, le=100)
